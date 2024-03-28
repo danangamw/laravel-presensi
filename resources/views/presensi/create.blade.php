@@ -32,7 +32,7 @@
 @section('content')
     <div class="row" style="margin-top: 70px">
         <div class="col">
-            <input type="text" id="lokasi">
+            <input type="hidden" id="lokasi">
             <div class="webcam-capture">
 
             </div>
@@ -41,10 +41,18 @@
 
     <div class="row">
         <div class="col">
+            @if ($cek > 0)
+               <button id="takepresensi" class="btn btn-danger btn-block">
+                <ion-icon name="camera-outline"></ion-icon>
+                Pulang
+            </button>
+            @else
+
             <button id="takepresensi" class="btn btn-primary btn-block">
                 <ion-icon name="camera-outline"></ion-icon>
                 Masuk
             </button>
+            @endif
 
         </div>
     </div>
@@ -54,12 +62,23 @@
             <div id="map"></div>
         </div>
     </div>
+
+    <audio id="notifikasi_in">
+        <source src="{{ asset('assets/sound/notifikasi_in.mp3')}}" type="audio/mpeg">
+    </audio>
+
+    <audio id="notifikasi_out">
+        <source src="{{ asset('assets/sound/notifikasi_out.mp3')}}" type="audio/mpeg">
+    </audio>
 @endsection
 
 @push('myscript')
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
+        var notifikasiIn = document.getElementById("notifikasi_in");
+        var notifikasiOut = document.getElementById("notifikasi_out");
+
         Webcam.set({
             height: 480,
             width: 640,
@@ -82,16 +101,62 @@
             }).addTo(map);
             var marker = L.marker([position.coords.latitude, position.coords.longitude]).addTo(map);
 
-            var circle = L.circle([-7.7604058, 110.4619708], {
+            var circle = L.circle([-7.752871, 110.450695], {
                 color: 'red',
                 fillColor: '#f03',
                 fillOpacity: 0.5,
-                radius: 500
+                radius: 50
             }).addTo(map);
         }
 
         function errorCallback() {
 
         }
+
+        $("#takepresensi").click(function(e) {
+            Webcam.snap(function(uri) {
+                image = uri;
+            });
+            let lokasi = $("#lokasi").val();
+            
+            $.ajax({
+                type: "POST",
+                url: "/presensi/store",
+                data: {
+                    _token: "{{ csrf_token() }}",
+                    image: image,
+                    lokasi: lokasi
+                },
+                cache: false,
+                success: function(response) {
+                    var status = response.split("|");
+                    
+                    if (status[0] == "success") {
+                        if(status[2] == "in") {
+                            notifikasiIn.play();
+                        } 
+
+                        if (status[2] == "out") {
+                            notifikasiOut.play();
+                        }
+                        Swal.fire({
+                            title: 'Berhasil!',
+                            text: status[1],
+                            icon: 'success',
+                        })
+                        setTimeout("location.href='/dashboard'", 3000);
+                    } else {
+                        Swal.fire({
+                            title: 'Gagal!',
+                            text: status[1],
+                            icon: 'error',
+                            confirmButtonText: 'OK'
+                        })
+                       
+                    }
+                } 
+            });
+            
+        })
     </script>
 @endpush
